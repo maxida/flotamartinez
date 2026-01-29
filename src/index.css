@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Site overrides */
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-800 antialiased;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+  }
+}
+
+/* small helper for container */
+.app-shell {
+  @apply min-h-screen flex bg-slate-50;
+}
+
+.sidebar-scroll {
+  @apply overflow-y-auto h-screen;
+}
