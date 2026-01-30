@@ -148,12 +148,16 @@ function parseToTimestamp(dateStr) {
 export default function DataSeeder() {
   const [loading, setLoading] = useState(false)
   const [progress, setProgress] = useState({ processed: 0, total: historialData.length, errors: [] })
+  const [counters, setCounters] = useState({ vehiculos: 0, choferes: 0, ordenes: 0 })
 
   const handleImport = async () => {
     if (loading) return
     setLoading(true)
     const errors = []
     let processed = 0
+    let vehiculosCount = 0
+    let choferesCount = 0
+    let ordenesCount = 0
 
     for (const item of historialData) {
       try {
@@ -167,22 +171,39 @@ export default function DataSeeder() {
         const vehiculoData = {}
         if (item.modelo) vehiculoData.modelo = item.modelo
         if (item.anio) vehiculoData.anio = item.anio
-        if (item.vtv) vehiculoData.vtv_vencimiento = item.vtv
-        if (item.oblea) vehiculoData.oblea_vencimiento = item.oblea
+        // try parse vtv/oblea to Timestamp, fallback to raw string
+        if (item.vtv) {
+          const tv = parseToTimestamp(item.vtv)
+          vehiculoData.vtv_vencimiento = tv ? tv : item.vtv
+        }
+        if (item.oblea) {
+          const ob = parseToTimestamp(item.oblea)
+          vehiculoData.oblea_vencimiento = ob ? ob : item.oblea
+        }
 
         if (Object.keys(vehiculoData).length > 0) {
-          const vehRef = doc(db, 'vehiculos', patente)
-          await setDoc(vehRef, { patente, ...vehiculoData }, { merge: true })
+          try {
+            const vehRef = doc(db, 'vehiculos', patente)
+            await setDoc(vehRef, { patente, ...vehiculoData }, { merge: true })
+            vehiculosCount++
+          } catch (err) {
+            throw new Error(`vehiculo:${err.message}`)
+          }
         }
 
         // 2) choferes: create if chofer present and not exists
         let choferId = null
         if (item.chofer) {
-          choferId = sanitizeId(item.chofer)
-          const choferRef = doc(db, 'choferes', choferId)
-          const choferSnap = await getDoc(choferRef)
-          if (!choferSnap.exists()) {
-            await setDoc(choferRef, { nombre: item.chofer, estado: 'ACTIVO' })
+          try {
+            choferId = sanitizeId(item.chofer)
+            const choferRef = doc(db, 'choferes', choferId)
+            const choferSnap = await getDoc(choferRef)
+            if (!choferSnap.exists()) {
+              await setDoc(choferRef, { nombre: item.chofer, estado: 'ACTIVO' })
+              choferesCount++
+            }
+          } catch (err) {
+            throw new Error(`chofer:${err.message}`)
           }
         }
 
@@ -198,36 +219,57 @@ export default function DataSeeder() {
           creado_en: Timestamp.now()
         }
 
-        const ts = parseToTimestamp(item.fecha || item.fecha)
+        const ts = parseToTimestamp(item.fecha)
         if (ts) orden.fecha = ts
         else orden.fecha = null
 
-        await addDoc(collection(db, 'ordenes'), orden)
+        try {
+          await addDoc(collection(db, 'ordenes'), orden)
+          ordenesCount++
+        } catch (err) {
+          throw new Error(`orden:${err.message}`)
+        }
 
         processed += 1
         setProgress(prev => ({ ...prev, processed }))
       } catch (err) {
-        errors.push({ item, error: err?.message || String(err) })
+        const message = err?.message || String(err)
+        console.error('Seed item error', { item, message })
+        errors.push({ item, error: message })
       }
     }
 
+    setCounters({ vehiculos: vehiculosCount, choferes: choferesCount, ordenes: ordenesCount })
     setProgress({ processed, total: historialData.length, errors })
     setLoading(false)
   }
 
   return (
-    <div style={{ padding: 12, border: '1px dashed #ccc', borderRadius: 6 }}>
-      <button onClick={handleImport} disabled={loading}>
-        {loading ? `Importando... (${progress.processed}/${progress.total})` : 'IMPORTAR HISTORIAL'}
-      </button>
-      <div style={{ marginTop: 8 }}>
-        Procesados: {progress.processed} / {progress.total}
+    <div style={{ padding: 16, border: '1px solid #e2e8f0', borderRadius: 8, maxWidth: 720, background: '#ffffff' }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <button onClick={handleImport} disabled={loading} style={{ padding: '8px 12px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, cursor: loading ? 'default' : 'pointer' }}>
+          {loading ? `Importando... (${progress.processed}/${progress.total})` : 'IMPORTAR HISTORIAL'}
+        </button>
+        <div style={{ color: '#374151' }}>Procesados: <strong>{progress.processed}</strong> / {progress.total}</div>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 12 }}>
+          <div style={{ fontSize: 13 }}>Vehículos: <strong>{counters.vehiculos}</strong></div>
+          <div style={{ fontSize: 13 }}>Choferes nuevos: <strong>{counters.choferes}</strong></div>
+          <div style={{ fontSize: 13 }}>Órdenes: <strong>{counters.ordenes}</strong></div>
+        </div>
       </div>
+
       {progress.errors && progress.errors.length > 0 && (
-        <details style={{ marginTop: 8 }}>
-          <summary>Errores ({progress.errors.length})</summary>
-          <pre style={{ maxHeight: 200, overflow: 'auto' }}>{JSON.stringify(progress.errors, null, 2)}</pre>
-        </details>
+        <div style={{ marginTop: 12, borderTop: '1px solid #f3f4f6', paddingTop: 12 }}>
+          <h4 style={{ margin: 0, fontSize: 14 }}>Errores ({progress.errors.length})</h4>
+          <ul style={{ maxHeight: 260, overflow: 'auto', paddingLeft: 18 }}>
+            {progress.errors.map((e, i) => (
+              <li key={i} style={{ fontSize: 13, color: '#b91c1c', marginBottom: 6 }}>
+                <div><strong>Error:</strong> {e.error}</div>
+                <div style={{ fontSize: 12, color: '#374151' }}>Patente: {e.item?.patente || 'N/A'} — Chofer: {e.item?.chofer || 'N/A'}</div>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   )

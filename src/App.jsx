@@ -11,7 +11,11 @@ import Dashboard from './pages/Dashboard'
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter
+      future={{
+        v7_relativeSplatPath: true,
+      }}
+    >
       <Nav />
       <main style={{ padding: 16 }}>
         <Routes>

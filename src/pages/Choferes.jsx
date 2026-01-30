@@ -1,57 +1,49 @@
-import { useEffect, useState } from 'react'
-import { getChoferes, addChofer } from '../services/choferesService'
-
+import React from 'react'
+import useCollection from '../hooks/useCollection'
 export default function Choferes() {
-  const [choferes, setChoferes] = useState([])
-  const [form, setForm] = useState({ nombre: '', dni: '', estado: 'Activo' })
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-
-  useEffect(() => { load() }, [])
-
-  async function load() {
-    setLoading(true)
-    try {
-      const data = await getChoferes()
-      setChoferes(data)
-    } catch (err) {
-      setError('No se pudieron cargar los choferes')
-    } finally { setLoading(false) }
-  }
-
-  async function handleAdd(e) {
-    e.preventDefault()
-    setError(null)
-    try {
-      await addChofer(form)
-      setForm({ nombre: '', dni: '', estado: 'Activo' })
-      load()
-    } catch (err) {
-      setError('Error al agregar chofer')
-    }
-  }
+  const { data: choferes, loading, error } = useCollection('choferes')
 
   return (
-    <section>
-      <h2>Choferes</h2>
-      {error && <div style={{ color: 'red' }}>{error}</div>}
-      <form onSubmit={handleAdd} style={{ marginBottom: 12 }}>
-        <input placeholder="Nombre" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} />
-        <input placeholder="DNI" value={form.dni} onChange={e => setForm({ ...form, dni: e.target.value })} />
-        <select value={form.estado} onChange={e => setForm({ ...form, estado: e.target.value })}>
-          <option>Activo</option>
-          <option>Inactivo</option>
-        </select>
-        <button type="submit">Agregar</button>
-      </form>
+    <div className="p-4">
+      <h2 className="text-xl font-semibold mb-4">Choferes</h2>
 
-      {loading ? <div>Cargando...</div> : (
-        <ul>
-          {choferes.map(c => (
-            <li key={c.id}>{c.nombre} — {c.dni} ({c.estado})</li>
-          ))}
-        </ul>
+      {loading && <p>Cargando...</p>}
+      {error && <p className="text-red-600">Error: {error.message}</p>}
+
+      {!loading && !error && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-100 text-slate-600 uppercase text-xs font-bold">
+                <th className="px-3 py-2">Nombre</th>
+                <th className="px-3 py-2">Estado</th>
+                <th className="px-3 py-2">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {choferes.map((c) => (
+                <tr key={c.id} className="border-b last:border-b-0 hover:bg-slate-50">
+                  <td className="px-3 py-3 align-top">{c.nombre || c.name || '-'}</td>
+                  <td className="px-3 py-3 align-top">
+                    <span className="px-2 py-0.5 rounded text-xs font-semibold text-green-700 bg-green-100">Activo</span>
+                  </td>
+                  <td className="px-3 py-3 align-top">
+                    <button
+                      type="button"
+                      title="Editar"
+                      className="inline-flex items-center justify-center p-1 rounded hover:bg-slate-100 text-slate-500"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4h6m2 2v6M4 20l4-4 10-10a2.828 2.828 0 114 4L12 20H4z" />
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
-    </section>
+    </div>
   )
 }
