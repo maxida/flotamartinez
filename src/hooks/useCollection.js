@@ -14,10 +14,15 @@ export default function useCollection(collectionName) {
       q,
       (snapshot) => {
         const items = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+        // debug log
+        // eslint-disable-next-line no-console
+        console.debug('[useCollection] snapshot', collectionName, 'size=', snapshot.size, items)
         setData(items)
         setLoading(false)
       },
       (err) => {
+        // eslint-disable-next-line no-console
+        console.error('[useCollection] onSnapshot error', collectionName, err)
         setError(err)
         setLoading(false)
       }

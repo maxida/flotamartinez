@@ -1,6 +1,6 @@
 import './App.css'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import Nav from './components/Nav'
+import Layout from './components/Layout'
 import Vehiculos from './pages/Vehiculos'
 import Choferes from './pages/Choferes'
 import Ordenes from './pages/Ordenes'
@@ -16,8 +16,7 @@ function App() {
         v7_relativeSplatPath: true,
       }}
     >
-      <Nav />
-      <main style={{ padding: 16 }}>
+      <Layout>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/vehiculos" element={<Vehiculos />} />
@@ -26,7 +25,7 @@ function App() {
           <Route path="/historial" element={<Historial />} />
           <Route path="/seed" element={<Seeder />} />
         </Routes>
-      </main>
+      </Layout>
     </BrowserRouter>
   )
 }

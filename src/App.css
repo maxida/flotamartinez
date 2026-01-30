@@ -6,16 +6,15 @@
 }
 
 .logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
+.logo {
+  height: 3.5rem;
+  padding: 0.25rem;
+  will-change: filter, transform;
+  transition: filter 220ms, transform 220ms;
 }
 .logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+  transform: translateY(-2px);
+  filter: drop-shadow(0 6px 18px rgba(249,115,22,0.18)); /* brand-accent shadow */
 }
 
 @keyframes logo-spin {
@@ -39,4 +38,5 @@
 
 .read-the-docs {
   color: #888;
+}
 }

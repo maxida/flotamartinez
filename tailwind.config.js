@@ -25,6 +25,13 @@ module.exports = {
         },
         warn: {
           DEFAULT: '#f59e0b'
+        },
+        /* Brand palette for Flota Martinez - Taller Mecánico */
+        brand: {
+          dark: '#0f172a',      // sidebar dark navy
+          primary: '#1e40af',   // intense blue for headings/borders
+          accent: '#f97316',    // vibrant orange for actions/alerts
+          bg: '#f1f5f9'         // very light gray background
         }
       }
     }
