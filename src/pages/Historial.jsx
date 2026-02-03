@@ -1,83 +1,88 @@
-import { useEffect, useState } from 'react'
-import { getOrdenes } from '../services/ordenesService'
+import React from 'react'
+import useCollection from '../hooks/useCollection'
 
-function formatDate(o) {
-  if (!o) return '-'
-  if (o.toDate) return o.toDate().toLocaleDateString()
-  try { return new Date(o).toLocaleDateString() } catch { return '-' }
-}
-
-function EstadoBadge({ estado }) {
-  const base = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold'
-  if (!estado) return <span className={base + ' bg-slate-100 text-slate-700'}>-</span>
-  if (estado === 'FINALIZADO') return <span className={base + ' bg-emerald-100 text-emerald-800'}>Finalizado</span>
-  if (estado === 'EN_PROCESO') return <span className={base + ' bg-amber-100 text-amber-800'}>En Proceso</span>
-  if (estado === 'PENDIENTE') return <span className={base + ' bg-indigo-100 text-indigo-800'}>Pendiente</span>
-  return <span className={base + ' bg-slate-100 text-slate-700'}>{estado}</span>
+// Función para formatear fechas desde Firebase
+const formatDate = (timestamp) => {
+  if (!timestamp) return '-';
+  // Si es un Timestamp de Firestore
+  if (timestamp.toDate) return timestamp.toDate().toLocaleDateString('es-AR');
+  // Si es un objeto Date o string
+  return new Date(timestamp).toLocaleDateString('es-AR');
 }
 
 export default function Historial() {
-  const [ordenes, setOrdenes] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  // Traemos TODAS las órdenes de la base de datos
+  const { data: ordenes, loading, error } = useCollection('ordenes')
 
-  useEffect(() => { load() }, [])
-
-  async function load() {
-    setLoading(true)
-    try {
-      const data = await getOrdenes()
-      const normalized = data.map(o => ({
-        ...o,
-        fecha_js: o.fecha_ingreso && typeof o.fecha_ingreso.toDate === 'function' ? o.fecha_ingreso.toDate() : (o.fecha_ingreso ? new Date(o.fecha_ingreso) : null)
-      }))
-      normalized.sort((a, b) => (b.fecha_js?.getTime() || 0) - (a.fecha_js?.getTime() || 0))
-      setOrdenes(normalized)
-    } catch (err) {
-      setError('No se pudo cargar el historial')
-    } finally { setLoading(false) }
-  }
+  // Filtramos solo las finalizadas y las ordenamos por fecha (más reciente primero)
+  const historialOrdenado = ordenes 
+    ? ordenes
+        .filter(o => o.estado_trabajo === 'FINALIZADO')
+        .sort((a, b) => {
+           // Ordenar por fecha descendente
+           const dateA = a.fecha_ingreso?.toDate ? a.fecha_ingreso.toDate() : new Date(0);
+           const dateB = b.fecha_ingreso?.toDate ? b.fecha_ingreso.toDate() : new Date(0);
+           return dateB - dateA;
+        })
+    : [];
 
   return (
-    <section className="bg-white rounded-xl shadow-md p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-slate-800">Historial de Órdenes</h2>
-        <div className="text-sm text-slate-500">Últimas entradas</div>
+    <div className="p-6 bg-slate-50 min-h-screen">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Historial de Reparaciones</h1>
+          <p className="text-slate-500 text-sm">Registro histórico y órdenes finalizadas</p>
+        </div>
+        <div className="bg-white px-4 py-2 rounded-lg shadow-sm border text-sm font-bold text-indigo-600">
+          Total: {historialOrdenado.length} Registros
+        </div>
       </div>
 
-      {error && <div className="text-red-600 mb-4">{error}</div>}
+      {loading && <p className="text-center py-4">Cargando historial...</p>}
+      {error && <p className="text-red-600">Error: {error.message}</p>}
 
-      {loading ? (
-        <div className="py-10 text-center text-slate-500">Cargando...</div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-100">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Fecha</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Patente</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Chofer</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">KM</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Estado</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Reparaciones / Novedad</th>
+      {!loading && !error && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-100 text-slate-600 uppercase text-xs font-bold border-b border-slate-200">
+                <th className="px-6 py-3">Fecha</th>
+                <th className="px-6 py-3">Vehículo</th>
+                <th className="px-6 py-3">Chofer</th>
+                <th className="px-6 py-3">Detalle Reparación</th>
+                <th className="px-6 py-3">Novedad / Observación</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-slate-100">
-              {ordenes.map(o => (
-                <tr key={o.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3 text-sm text-slate-700">{o.fecha_js ? o.fecha_js.toLocaleDateString() : '-'}</td>
-                  <td className="px-4 py-3 text-sm text-slate-700 font-medium">{o.vehiculo_patente}</td>
-                  <td className="px-4 py-3 text-sm text-slate-600">{o.chofer_nombre}</td>
-                  <td className="px-4 py-3 text-sm text-slate-600">{o.km_ingreso || '-'}</td>
-                  <td className="px-4 py-3 text-sm"> <EstadoBadge estado={o.estado_trabajo} /> </td>
-                  <td className="px-4 py-3 text-sm text-slate-700">
-                    {Array.isArray(o.reparaciones_realizadas) && o.reparaciones_realizadas.length > 0 ? (
-                      <ul className="list-disc pl-5">
-                        {o.reparaciones_realizadas.map((r, idx) => (
-                          <li key={idx} className="text-slate-700">{r.item}: {r.detalle || r.costo}</li>
+            <tbody className="divide-y divide-slate-100 text-sm">
+              {historialOrdenado.map((orden) => (
+                <tr key={orden.id} className="hover:bg-slate-50">
+                  <td className="px-6 py-3 font-medium text-slate-700 whitespace-nowrap">
+                    {formatDate(orden.fecha_ingreso)}
+                  </td>
+                  <td className="px-6 py-3">
+                    <span className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded font-mono font-bold border border-indigo-100">
+                      {orden.vehiculo_patente}
+                    </span>
+                  </td>
+                  <td className="px-6 py-3 text-slate-600 capitalize">
+                    {orden.chofer_nombre?.toLowerCase()}
+                  </td>
+                  <td className="px-6 py-3 text-slate-600">
+                    {/* Renderizar objeto de reparaciones o texto */}
+                    {orden.detalle_reparacion && typeof orden.detalle_reparacion === 'object' ? (
+                      <ul className="list-disc list-inside">
+                        {Object.entries(orden.detalle_reparacion).map(([key, val]) => (
+                          <li key={key}>
+                            <span className="font-semibold capitalize">{key.replace('_', ' ')}:</span> {val}
+                          </li>
                         ))}
                       </ul>
-                    ) : ('-')}
+                    ) : (
+                      <span>{orden.detalle_reparacion || '-'}</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-3 text-slate-500 italic">
+                    {orden.observaciones || '-'}
                   </td>
                 </tr>
               ))}
@@ -85,6 +90,6 @@ export default function Historial() {
           </table>
         </div>
       )}
-    </section>
+    </div>
   )
 }

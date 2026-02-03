@@ -8,6 +8,7 @@ import CreateOrder from './pages/CreateOrder'
 import Historial from './pages/Historial'
 import Seeder from './components/Seeder'
 import Dashboard from './pages/Dashboard'
+import DataSeeder from './components/DataSeeder' // <--- 1. Importamos la nueva herramienta
 
 function App() {
   return (
@@ -17,6 +18,9 @@ function App() {
       }}
     >
       <Layout>
+        {/* 2. Ponemos el botón aquí temporalmente para usarlo */}
+        <DataSeeder /> 
+        
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/vehiculos" element={<Vehiculos />} />
