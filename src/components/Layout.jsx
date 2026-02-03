@@ -1,66 +1,101 @@
-import { Link } from 'react-router-dom'
+import React from 'react'
+import { Link, useLocation } from 'react-router-dom'
+
+const NAV = [
+  { to: '/', label: 'Dashboard', icon: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+      <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M3 9.75L12 4l9 5.75M12 4v16" />
+    </svg>
+  ) },
+  { to: '/ordenes/nueva', label: 'Ingreso', icon: (
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+      <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+    </svg>
+  ) },
+  { to: '/historial', label: 'Historial', icon: (
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+      <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M3 7v6h6" />
+    </svg>
+  ) },
+  { to: '/vehiculos', label: 'Vehículos', icon: (
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+      <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M3 13l2-6h14l2 6v6a1 1 0 0 1-1 1h-1a2 2 0 1 1-4 0H9a2 2 0 1 1-4 0H4a1 1 0 0 1-1-1v-6z" />
+    </svg>
+  ) },
+  { to: '/choferes', label: 'Choferes', icon: (
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+      <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M5.121 17.804A9 9 0 1118.879 6.196 9 9 0 015.12 17.804zM12 11a3 3 0 100-6 3 3 0 000 6z" />
+    </svg>
+  ) }
+]
 
 export default function Layout({ children }) {
+  const location = useLocation()
+
   return (
-    <div className="app-shell flex">
-      <aside className="w-80 bg-brand-dark sidebar-scroll min-h-screen">
-        <div className="p-6 border-b border-brand-primary/20 flex items-center justify-center">
-          {/* Large centered logo */}
-          <img src="/logo.png" alt="Flota Martinez" className="h-32 w-auto mx-auto object-contain logo" />
+    <div className="h-screen w-full flex overflow-hidden bg-slate-100 text-slate-700">
+      {/* Sidebar - solid block on the left (no absolute/fixed positioning) */}
+      <aside className="w-64 h-full flex-shrink-0 bg-slate-900 text-slate-300 flex flex-col">
+        {/* Logo - fixed height */}
+        <div className="h-20 flex items-center justify-center border-b border-slate-800 px-6">
+          <img src="/logo.png" alt="Flota Martinez" className="h-12 w-auto object-contain" />
         </div>
-        <nav className="p-6">
-          <ul className="space-y-3">
-            <li>
-              <Link to="/" className="flex items-center gap-4 px-4 py-3 rounded hover:bg-brand-accent hover:text-white text-lg font-medium text-slate-900">
-                <svg className="w-6 h-6 text-slate-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M3 9.75L12 4l9 5.75M12 4v16"/></svg>
-                <span>Dashboard</span>
-              </Link>
-            </li>
-            <li>
-              <Link to="/ordenes/nueva" className="flex items-center gap-4 px-4 py-3 rounded hover:bg-brand-accent hover:text-white text-lg font-medium text-slate-900">
-                <svg className="w-6 h-6 text-slate-900" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
-                <span>Ingreso</span>
-              </Link>
-            </li>
-            <li>
-              <Link to="/historial" className="flex items-center gap-4 px-4 py-3 rounded hover:bg-brand-accent hover:text-white text-lg font-medium text-slate-900">
-                <svg className="w-6 h-6 text-slate-900" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M3 7v6h6"/></svg>
-                <span>Historial</span>
-              </Link>
-            </li>
-            <li>
-              <Link to="/vehiculos" className="flex items-center gap-4 px-4 py-3 rounded hover:bg-brand-accent hover:text-white text-lg font-medium text-slate-900">
-                <svg className="w-6 h-6 text-slate-900" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M3 13l2-6h14l2 6v6a1 1 0 0 1-1 1h-1a2 2 0 1 1-4 0H9a2 2 0 1 1-4 0H4a1 1 0 0 1-1-1v-6z"/></svg>
-                <span>Vehículos</span>
-              </Link>
-            </li>
-            <li>
-              <Link to="/choferes" className="flex items-center gap-4 px-4 py-3 rounded hover:bg-brand-accent hover:text-white text-lg font-medium text-slate-900">
-                <svg className="w-6 h-6 text-slate-900" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M5.121 17.804A9 9 0 1118.879 6.196 9 9 0 015.12 17.804zM12 11a3 3 0 100-6 3 3 0 000 6z"/></svg>
-                <span>Choferes</span>
-              </Link>
-            </li>
+
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto px-3 py-6 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+          <ul className="space-y-1">
+            {NAV.map((item) => {
+              const active = location.pathname === item.to || (item.to !== '/' && location.pathname.startsWith(item.to))
+              return (
+                <li key={item.to}>
+                  <Link
+                    to={item.to}
+                    className={`group flex items-center gap-3 w-full px-4 py-3 rounded-md text-sm font-medium transition-colors ${active ? 'bg-slate-800 text-white border-l-4 border-amber-500' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}
+                  >
+                    <span className="opacity-90 text-slate-300 group-hover:text-white">{item.icon}</span>
+                    <span className="truncate">{item.label}</span>
+                  </Link>
+                </li>
+              )
+            })}
           </ul>
         </nav>
+
+        {/* User footer */}
+        <div className="px-4 py-4 border-t border-slate-800">
+          <div className="text-xs text-slate-400">Conectado como</div>
+          <div className="mt-2 flex items-center gap-3">
+            <div className="w-9 h-9 bg-slate-700 rounded-full flex items-center justify-center text-white text-sm">JM</div>
+            <div>
+              <div className="text-sm text-slate-100">Jose M. Martinez</div>
+              <div className="text-xs text-slate-400">Admin</div>
+            </div>
+          </div>
+        </div>
       </aside>
 
-      <div className="flex-1 min-h-screen bg-brand-bg">
-        <header className="bg-white border-b border-brand-primary/20 px-6 py-4 flex items-center justify-between">
+      {/* Main content area */}
+      <main className="flex-1 flex flex-col h-full bg-slate-50">
+        <header className="w-full bg-white h-16 shadow-sm flex items-center justify-between px-6">
           <div>
-            <h2 className="text-lg font-semibold text-brand-primary">Panel</h2>
-            <p className="text-sm text-slate-500">Resumen y operaciones</p>
+            <h1 className="text-lg font-semibold text-slate-800">Panel</h1>
+            <p className="text-xs text-slate-500">Resumen y operaciones</p>
           </div>
+
           <div className="flex items-center gap-4">
-            <button className="bg-brand-accent text-white px-3 py-1 rounded shadow-sm text-sm">Nuevo</button>
+            <button className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1 rounded text-sm">Nuevo</button>
             <div className="text-sm text-slate-600">Jose Maria Martinez</div>
-            <div className="w-9 h-9 bg-slate-100 rounded-full flex items-center justify-center text-slate-700">JM</div>
+            <div className="w-9 h-9 bg-slate-200 rounded-full flex items-center justify-center text-slate-700">JM</div>
           </div>
         </header>
 
-        <main className="p-6">
-          {children}
-        </main>
-      </div>
+        {/* Only this area scrolls - remove padding so child pages control spacing (zero top gap) */}
+        <div className="flex-1 overflow-y-auto p-0 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-thumb]:rounded-full">
+          <div className="w-full">
+            {children}
+          </div>
+        </div>
+      </main>
     </div>
   )
 }

@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { db } from '../services/firebase';
+import { db } from '../services/firebase'; 
 import { collection, doc, setDoc, addDoc, Timestamp } from 'firebase/firestore';
 
 const DataSeeder = () => {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
 
-  // DATOS DEL EXCEL LIMPIOS Y LISTOS PARA SUBIR
+  // TUS DATOS (FLOTA MARTINEZ 1)
   const historialData = [
     { "patente": "AD129AI", "modelo": "Kangoo", "anio": null, "fecha": "2025-12-26", "km": 129879, "chofer": "JOSE MARIA", "reparaciones": {"tren_delantero": "bieletas- casoletas- crapodinas- ruleman de rueda lado izq"} },
     { "patente": "JAO082", "modelo": "H1", "anio": 2010, "vtv": "2024-04-01", "fecha": "2025-11-04", "km": 229635, "chofer": "JOSE MARIA", "reparaciones": {}, "novedad": "LEVANTA TEMPERATURA" },
@@ -37,79 +37,143 @@ const DataSeeder = () => {
     { "patente": "JAO082", "modelo": "H1", "anio": null, "fecha": "2025-12-08", "km": null, "reparaciones": {"frenos": "CAMBIO DE CABLE DE FRENO TRASERO"} }
   ];
 
+  // Función auxiliar para parsear fechas y compararlas
+  const parseDate = (dateStr) => {
+    if (!dateStr) return new Date(0); // Fecha muy vieja si es null
+    // Intenta parsear ISO (YYYY-MM-DD)
+    let d = new Date(dateStr);
+    if (!isNaN(d)) return d;
+    // Intenta parsear DD/MM/YYYY si falla lo anterior
+    if (dateStr.includes('/')) {
+        const parts = dateStr.split('/');
+        if(parts.length === 3) return new Date(parts[2], parts[1]-1, parts[0]);
+    }
+    return new Date(0);
+  };
+
   const handleUpload = async () => {
     setLoading(true);
-    setStatus('Iniciando carga masiva...');
+    setStatus('Calculando los mejores datos (KM, VTV, Oblea)...');
     try {
-      let count = 0;
-      for (const item of historialData) {
-        
-        // 1. Guardar Vehículo
-        if (item.patente) {
-          const vehiculoRef = doc(db, 'vehiculo', item.patente); // OJO: 'vehiculo' en singular como tienes en tu DB
-          await setDoc(vehiculoRef, {
-            patente: item.patente,
-            modelo: item.modelo || 'Desconocido',
-            anio: item.anio || null,
-            vtv_vencimiento: item.vtv || null,
-            oblea_vencimiento: item.oblea || null
-          }, { merge: true });
+      // 1. LÓGICA PREVIA: Encontrar "Lo mejor" para cada patente
+      const bestData = {}; // { AD129AI: { maxKm: 0, maxVTV: '...', maxOblea: '...' } }
+
+      historialData.forEach(item => {
+        if (!item.patente) return;
+        const p = item.patente;
+
+        // Inicializar si no existe
+        if (!bestData[p]) {
+            bestData[p] = { maxKm: 0, latestVTV: null, latestOblea: null, anio: null };
         }
 
-        // 2. Guardar Chofer
+        // A) Mejor KM (Mayor gana)
+        if (item.km && item.km > bestData[p].maxKm) {
+            bestData[p].maxKm = item.km;
+        }
+
+        // B) Mejor VTV (Fecha más futura gana)
+        if (item.vtv) {
+            const currentVTV = parseDate(bestData[p].latestVTV);
+            const newVTV = parseDate(item.vtv);
+            if (newVTV > currentVTV) bestData[p].latestVTV = item.vtv;
+        }
+
+        // C) Mejor Oblea (Fecha más futura gana)
+        if (item.oblea) {
+            const currentOblea = parseDate(bestData[p].latestOblea);
+            const newOblea = parseDate(item.oblea);
+            if (newOblea > currentOblea) bestData[p].latestOblea = item.oblea;
+        }
+        
+        // D) Año: preferir un valor numérico no nulo (tomar el mayor si hay varios)
+        if (item.anio && Number.isFinite(Number(item.anio))) {
+            const y = Number(item.anio);
+            if (!bestData[p].anio || y > bestData[p].anio) bestData[p].anio = y;
+        }
+      });
+
+      setStatus('Iniciando carga de datos optimizados...');
+      let count = 0;
+
+      for (const item of historialData) {
+        
+        // 2. Guardar Vehículo usando los DATOS GANADORES
+        if (item.patente) {
+          const vehiculoRef = doc(db, 'vehiculo', item.patente);
+          const mejoresDatos = bestData[item.patente];
+
+          // Solo guardamos si tenemos datos válidos
+          // Construir payload evitando sobrescribir el año con null
+          const vehPayload = {
+            patente: item.patente,
+            modelo: item.modelo || 'Desconocido',
+            // Usamos las fechas "ganadoras"
+            vtv_vencimiento: mejoresDatos.latestVTV || null,
+            oblea_vencimiento: mejoresDatos.latestOblea || null,
+            // Usamos el KM ganador
+            kilometros: mejoresDatos.maxKm || item.km || 0,
+            fecha_trabajo: item.fecha || null
+          };
+          if (mejoresDatos.anio) vehPayload.anio = mejoresDatos.anio;
+
+          await setDoc(vehiculoRef, vehPayload, { merge: true });
+        }
+
+        // 3. Guardar Chofer
         if (item.chofer) {
           const choferId = item.chofer.toLowerCase().replace(/\s/g, '');
-          const choferRef = doc(db, 'chofer', choferId); // OJO: 'chofer' en singular
+          const choferRef = doc(db, 'chofer', choferId);
           await setDoc(choferRef, {
             nombre: item.chofer.trim(),
             estado: 'Activo'
           }, { merge: true });
         }
 
-        // 3. Crear Historial (Orden Finalizada)
+        // 4. Crear Historial (Orden Finalizada)
         const fechaDate = item.fecha ? new Date(item.fecha) : new Date();
         
         await addDoc(collection(db, 'ordenes'), {
           vehiculo_patente: item.patente,
           chofer_nombre: item.chofer || 'Desconocido',
           fecha_ingreso: Timestamp.fromDate(fechaDate),
-          fecha_salida: Timestamp.fromDate(fechaDate), // Como ya pasó, ponemos la misma fecha
+          fecha_salida: Timestamp.fromDate(fechaDate),
           km_ingreso: item.km || 0,
           estado_trabajo: 'FINALIZADO',
-          origen: 'HISTORIAL_EXCEL',
+          origen: 'MIGRACION_FINAL_BEST_DATES',
           detalle_reparacion: item.reparaciones || {},
           observaciones: item.novedad || ''
         });
 
         count++;
-        setStatus(`Subiendo registro ${count} de ${historialData.length}...`);
+        setStatus(`Procesando registro ${count}...`);
       }
-      setStatus('¡Carga completa! Revisa la pestaña Historial.');
-      alert('Datos históricos cargados exitosamente.');
+      setStatus('¡Todo listo! Fechas y KM actualizados al más reciente.');
+      alert('Base de datos actualizada: Ahora verás los vencimientos más nuevos.');
     } catch (error) {
       console.error(error);
-      setStatus('Error al cargar. Revisa la consola (F12).');
+      setStatus('Error al cargar datos. Revisa la consola.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg m-4 shadow-sm">
-      <h3 className="text-lg font-bold text-blue-800 mb-2">📥 Cargar Historial Excel</h3>
-      <p className="text-sm text-blue-600 mb-4">
-        Presiona para subir los {historialData.length} registros del Excel a Firebase.
+    <div className="p-6 bg-purple-50 border border-purple-200 rounded-lg m-0 shadow-sm text-center">
+      <h3 className="text-xl font-bold text-purple-800 mb-2">📅 Actualizar VTV y Obleas</h3>
+      <p className="text-purple-700 mb-1">
+        Este proceso buscará la fecha de vencimiento <b>MÁS FUTURA</b> y el <b>MAYOR</b> kilometraje.
       </p>
       <button 
         onClick={handleUpload} 
         disabled={loading}
-        className={`px-6 py-2 rounded text-white font-bold transition-colors ${
-          loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+        className={`px-8 py-3 rounded-lg text-white font-bold text-lg shadow transition-colors ${
+          loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'
         }`}
       >
-        {loading ? 'Subiendo datos...' : 'INICIAR CARGA AHORA'}
+        {loading ? 'Analizando fechas...' : 'CORREGIR FECHAS Y KM'}
       </button>
-      {status && <p className="mt-3 text-sm font-semibold text-slate-700">{status}</p>}
+      {status && <p className="mt-4 text-sm font-semibold text-purple-900 bg-purple-100 py-2 rounded">{status}</p>}
     </div>
   );
 };
