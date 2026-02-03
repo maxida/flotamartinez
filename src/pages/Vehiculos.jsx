@@ -1,7 +1,7 @@
 import React from 'react'
 import useCollection from '../hooks/useCollection'
 
-// --- CORRECCIÓN CLAVE: Parser de Fechas Argentinas ---
+// --- FUNCIÓN DE FECHAS MEJORADA (Soporta MM/AAAA) ---
 const formatDate = (dateValue) => {
   if (!dateValue) return null;
   
@@ -10,18 +10,31 @@ const formatDate = (dateValue) => {
     return dateValue.toDate();
   }
   
-  // 2. Si es string tipo "DD/MM/YYYY" (Formato Argentino/Excel)
-  if (typeof dateValue === 'string' && dateValue.includes('/')) {
-    // Convertimos "31/10/2025" a "2025-10-31" para que JS lo entienda
-    const parts = dateValue.split('/');
-    if (parts.length === 3) {
-      // Asumimos [Día, Mes, Año]
-      const day = parts[0];
-      const month = parts[1];
-      const year = parts[2];
-      // Creamos la fecha en formato ISO
-      const isoDate = new Date(`${year}-${month}-${day}`);
-      if (!isNaN(isoDate.getTime())) return isoDate;
+  // 2. Si es string
+  if (typeof dateValue === 'string') {
+    // Limpiamos espacios por si acaso
+    const cleanDate = dateValue.trim();
+
+    if (cleanDate.includes('/')) {
+      const parts = cleanDate.split('/');
+
+      // CASO A: Formato completo "DD/MM/YYYY" (Ej: "18/08/2025")
+      if (parts.length === 3) {
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10);
+        const year = parseInt(parts[2], 10);
+        return new Date(year, month - 1, day);
+      }
+
+      // CASO B: Formato corto "MM/YYYY" (Ej: "09/2025" como se ve en tu Firebase)
+      // Asumiremos que vence el ÚLTIMO día de ese mes.
+      if (parts.length === 2) {
+        const month = parseInt(parts[0], 10);
+        const year = parseInt(parts[1], 10);
+        // (year, month, 0) crea una fecha en el último día del mes anterior, 
+        // por eso usamos month tal cual para obtener el último día de ESE mes.
+        return new Date(year, month, 0); 
+      }
     }
   }
 
@@ -47,6 +60,7 @@ const RenderDateBadge = ({ dateRaw }) => {
   const isExpired = date < today;
   const diffTime = date - today;
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  // Avisar si vence en los próximos 30 días
   const isSoon = diffDays > 0 && diffDays <= 30; 
 
   let styles = "bg-green-100 text-green-800 border-green-200";
@@ -70,11 +84,6 @@ const RenderDateBadge = ({ dateRaw }) => {
 export default function Vehiculos() {
   const { data: vehiculos, loading, error } = useCollection('vehiculo')
 
-  // Debug: Mira la consola del navegador (F12) para ver EXACTAMENTE qué datos llegan
-  if (vehiculos?.length > 0) {
-    console.log("🔍 Datos crudos del primer vehículo:", vehiculos[0]);
-  }
-
   return (
     <div className="p-6 bg-slate-50 min-h-screen">
       <div className="flex justify-between items-center mb-6">
@@ -88,7 +97,7 @@ export default function Vehiculos() {
       </div>
 
       {error && <p className="text-red-600">Error: {error.message}</p>}
-      {loading && <p>Cargando...</p>}
+      {loading && <div className="text-center py-4">Cargando flota...</div>}
 
       {!loading && !error && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -98,6 +107,7 @@ export default function Vehiculos() {
                 <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-bold tracking-wider">
                   <th className="px-6 py-4">Patente</th>
                   <th className="px-6 py-4">Vehículo</th>
+                  <th className="px-6 py-4">Año</th>
                   <th className="px-6 py-4">Kilometraje</th>
                   <th className="px-6 py-4">Vencimiento VTV</th>
                   <th className="px-6 py-4">Vencimiento GNC</th>
@@ -105,15 +115,16 @@ export default function Vehiculos() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {vehiculos.map((v) => {
-                  // Mapeo seguro de campos
+                  // Mapeo seguro de campos según tu imagen de Firebase
                   const patente = v.patente || v.dominio || v.DOMINIO || v.id || 'S/D';
-                  const modelo = v.modelo || v.MODELO || v.modeloVehiculo || 'Desconocido';
-                  const anio = v.anio || v.year || '';
-                  const km = v.kilometros ?? v.km ?? v.kilometraje ?? null;
+                  const modelo = v.modelo || v.MODELO || 'Desconocido';
+                  // Support the Firebase field named "año" (con tilde) además de anio/year
+                  const anio = v['año'] ?? v.anio ?? v.year ?? '';
+                  const km = v.kilometros ?? v.km ?? null;
                   
-                  // AQUI BUSCAMOS TODAS LAS VARIANTES DE NOMBRES
-                  const fechaVTV = v.vtv_vencimiento || v.vtv || v.VTV || null;
-                  const fechaOblea = v.oblea_vencimiento || v.oblea_vencimiento || v.oblea || v.OBLEA || null;
+                  // Nombres exactos vistos en tu imagen (VTV y oblea)
+                  const fechaVTV = v.VTV || v.vtv || v.vtv_vencimiento || null;
+                  const fechaOblea = v.oblea || v.OBLEA || v.oblea_vencimiento || null;
 
                   return (
                     <tr key={v.id} className="hover:bg-slate-50 transition-colors">
@@ -123,11 +134,9 @@ export default function Vehiculos() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex flex-col">
-                          <span className="font-medium text-slate-800 capitalize">{modelo}</span>
-                          <span className="text-xs text-slate-400">{anio}</span>
-                        </div>
+                        <span className="font-medium text-slate-800 capitalize">{modelo}</span>
                       </td>
+                      <td className="px-6 py-4 text-slate-700 font-medium">{anio || '-'}</td>
                       <td className="px-6 py-4 font-medium text-slate-600">{formatKm(km)}</td>
                       <td className="px-6 py-4">
                         <RenderDateBadge dateRaw={fechaVTV} />

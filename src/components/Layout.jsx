@@ -34,6 +34,12 @@ export default function Layout({ children }) {
                 <span>Vehículos</span>
               </Link>
             </li>
+            <li>
+              <Link to="/choferes" className="flex items-center gap-4 px-4 py-3 rounded hover:bg-brand-accent hover:text-white text-lg font-medium text-slate-900">
+                <svg className="w-6 h-6 text-slate-900" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M5.121 17.804A9 9 0 1118.879 6.196 9 9 0 015.12 17.804zM12 11a3 3 0 100-6 3 3 0 000 6z"/></svg>
+                <span>Choferes</span>
+              </Link>
+            </li>
           </ul>
         </nav>
       </aside>
