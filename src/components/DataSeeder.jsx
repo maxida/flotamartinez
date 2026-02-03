@@ -158,24 +158,7 @@ const DataSeeder = () => {
     }
   };
 
-  return (
-    <div className="p-6 bg-purple-50 border border-purple-200 rounded-lg m-0 shadow-sm text-center">
-      <h3 className="text-xl font-bold text-purple-800 mb-2">📅 Actualizar VTV y Obleas</h3>
-      <p className="text-purple-700 mb-1">
-        Este proceso buscará la fecha de vencimiento <b>MÁS FUTURA</b> y el <b>MAYOR</b> kilometraje.
-      </p>
-      <button 
-        onClick={handleUpload} 
-        disabled={loading}
-        className={`px-8 py-3 rounded-lg text-white font-bold text-lg shadow transition-colors ${
-          loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'
-        }`}
-      >
-        {loading ? 'Analizando fechas...' : 'CORREGIR FECHAS Y KM'}
-      </button>
-      {status && <p className="mt-4 text-sm font-semibold text-purple-900 bg-purple-100 py-2 rounded">{status}</p>}
-    </div>
-  );
+  
 };
 
 export default DataSeeder;
