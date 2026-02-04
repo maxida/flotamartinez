@@ -22,9 +22,7 @@ export default function Ordenes() {
   return (
     <section>
       <h2>Órdenes de trabajo</h2>
-      <div style={{ marginBottom: 12 }}>
-        <Link to="/ordenes/nueva">Crear nueva orden</Link>
-      </div>
+      {/* Crear nueva orden link removed */}
       {error && <div style={{ color: 'red' }}>{error}</div>}
       {loading ? <div>Cargando...</div> : (
         <ul>

@@ -7,11 +7,6 @@ const NAV = [
       <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M3 9.75L12 4l9 5.75M12 4v16" />
     </svg>
   ) },
-  { to: '/ordenes/nueva', label: 'Ingreso', icon: (
-    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
-      <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-    </svg>
-  ) },
   { to: '/historial', label: 'Historial', icon: (
     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
       <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M3 7v6h6" />
@@ -35,10 +30,10 @@ export default function Layout({ children }) {
   return (
     <div className="h-screen w-full flex overflow-hidden bg-slate-100 text-slate-700">
       {/* Sidebar - solid block on the left (no absolute/fixed positioning) */}
-      <aside className="w-64 h-full flex-shrink-0 bg-slate-900 text-slate-300 flex flex-col">
+      <aside className="w-64 h-[calc(100vh-1cm)] flex-shrink-0 bg-slate-900 text-slate-300 flex flex-col">
         {/* Logo - fixed height */}
         <div className="h-20 flex items-center justify-center border-b border-slate-800 px-6">
-          <img src="/logo.png" alt="Flota Martinez" className="h-12 w-auto object-contain" />
+          <img src="/logo.png" alt="Flota Martinez" className="h-20 w-auto object-contain" />
         </div>
 
         {/* Navigation */}
@@ -76,20 +71,7 @@ export default function Layout({ children }) {
 
       {/* Main content area */}
       <main className="flex-1 flex flex-col h-full bg-slate-50">
-        <header className="w-full bg-white h-16 shadow-sm flex items-center justify-between px-6">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-800">Panel</h1>
-            <p className="text-xs text-slate-500">Resumen y operaciones</p>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <button className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1 rounded text-sm">Nuevo</button>
-            <div className="text-sm text-slate-600">Jose Maria Martinez</div>
-            <div className="w-9 h-9 bg-slate-200 rounded-full flex items-center justify-center text-slate-700">JM</div>
-          </div>
-        </header>
-
-        {/* Only this area scrolls - remove padding so child pages control spacing (zero top gap) */}
+        {/* Main content area: children pages control their own headers */}
         <div className="flex-1 overflow-y-auto p-0 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-thumb]:rounded-full">
           <div className="w-full">
             {children}
