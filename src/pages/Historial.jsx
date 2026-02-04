@@ -49,17 +49,7 @@ export default function Historial() {
     vehiculo_patente: '', chofer_nombre: '', fecha: '', km_ingreso: '', estado_trabajo: 'FINALIZADO', detalle_reparacion: '', observaciones: ''
   })
 
-  // Filtramos solo las finalizadas y las ordenamos por fecha (más reciente primero)
-  const historialOrdenado = ordenes 
-    ? ordenes
-        .filter(o => o.estado_trabajo === 'FINALIZADO')
-        .sort((a, b) => {
-           // Ordenar por fecha descendente
-           const dateA = a.fecha_ingreso?.toDate ? a.fecha_ingreso.toDate() : new Date(0);
-           const dateB = b.fecha_ingreso?.toDate ? b.fecha_ingreso.toDate() : new Date(0);
-           return dateB - dateA;
-        })
-    : [];
+  // Mostramos todas las órdenes (no filtradas por estado) y aplicamos orden/filtrado en memoria
 
   // Helpers: get displayed ordenes after applying filters and sort
   const getValueByField = (item, field) => {
@@ -70,14 +60,14 @@ export default function Historial() {
 
   const filteredAndSorted = useMemo(() => {
     if (!ordenes) return []
-    let list = ordenes
-      // Show finalizadas plus any recently created/edited items so they don't "disappear" when status changes
-      .filter(o => o.estado_trabajo === 'FINALIZADO' || includedIds.includes(o.id))
-      .filter(o => {
-        const pMatch = !patenteFilter || (o.vehiculo_patente || '').toLowerCase().includes(patenteFilter.toLowerCase())
-        const cMatch = !choferFilter || (o.chofer_nombre || '').toLowerCase().includes(choferFilter.toLowerCase())
-        return pMatch && cMatch
-      })
+    // start from all orders (copy array to avoid mutating source)
+    let list = Array.isArray(ordenes) ? [...ordenes] : []
+    // apply patente / chofer filters
+    list = list.filter(o => {
+      const pMatch = !patenteFilter || (o.vehiculo_patente || '').toLowerCase().includes(patenteFilter.toLowerCase())
+      const cMatch = !choferFilter || (o.chofer_nombre || '').toLowerCase().includes(choferFilter.toLowerCase())
+      return pMatch && cMatch
+    })
 
     list.sort((a, b) => {
       const va = getValueByField(a, sortField)
@@ -151,7 +141,9 @@ export default function Historial() {
         setIncludedIds(prev => prev.includes(editing.id) ? prev : [...prev, editing.id])
         alert('Orden actualizada')
       } else {
+        console.debug('[Historial] addOrden payload', payload)
         const res = await addOrden(payload)
+        console.debug('[Historial] addOrden result', res)
         if (res?.id) setIncludedIds(prev => prev.includes(res.id) ? prev : [...prev, res.id])
         alert('Orden creada')
       }
