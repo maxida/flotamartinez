@@ -30,10 +30,10 @@ export default function Layout({ children }) {
   return (
     <div className="h-screen w-full flex overflow-hidden bg-slate-100 text-slate-700">
       {/* Sidebar - solid block on the left (no absolute/fixed positioning) */}
-      <aside className="w-64 h-[calc(100vh-1cm)] flex-shrink-0 bg-slate-900 text-slate-300 flex flex-col">
+      <aside className="w-48 h-[calc(100vh-1cm)] flex-shrink-0 bg-slate-900 text-slate-300 flex flex-col">
         {/* Logo - fixed height */}
-        <div className="h-20 flex items-center justify-center border-b border-slate-800 px-6">
-          <img src="/logo.png" alt="Flota Martinez" className="h-20 w-auto object-contain" />
+        <div className="h-20 flex items-center justify-center border-b border-slate-800 px-4">
+          <img src="/logo.png" alt="Flota Martinez" className="h-16 w-auto object-contain" />
         </div>
 
         {/* Navigation */}
@@ -72,8 +72,8 @@ export default function Layout({ children }) {
       {/* Main content area */}
       <main className="flex-1 flex flex-col h-full bg-slate-50">
         {/* Main content area: children pages control their own headers */}
-        <div className="flex-1 overflow-y-auto p-0 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-thumb]:rounded-full">
-          <div className="w-full">
+        <div className="flex-1 overflow-y-auto p-6 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-thumb]:rounded-full">
+          <div className="w-full max-w-full">
             {children}
           </div>
         </div>

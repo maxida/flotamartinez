@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import useCollection from '../hooks/useCollection'
-import { addOrden, updateOrden, deleteOrden } from '../services/ordenesService'
+import { addOrden, updateOrden, deleteOrden, deleteFinalizados } from '../services/ordenesService'
 
 // Función para formatear fechas desde Firebase
 const formatDate = (timestamp) => {
@@ -10,7 +10,27 @@ const formatDate = (timestamp) => {
   // Si es un objeto Date o string
   return new Date(timestamp).toLocaleDateString('es-AR');
 }
+// Render small badge for estado_trabajo
+const renderEstadoBadge = (estado) => {
+  const v = (estado || '').toString().trim().toUpperCase()
+  if (!v) return <span className="px-2 py-1 rounded-full text-xs bg-slate-100 text-slate-700">-</span>
 
+  if (v === 'FINALIZADO') {
+    return <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 font-medium">FINALIZADO</span>
+  }
+
+  // EN PROCESO / TALLER variants
+  if (v === 'EN PROCESO' || v === 'EN_PROCESO' || v === 'EN_CURSO' || v === 'ENCURSO' || v === 'TALLER' || v === 'EN_CURSO') {
+    return <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800 font-medium">{estado}</span>
+  }
+
+  if (v === 'PENDIENTE') {
+    return <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800 font-medium">PENDIENTE</span>
+  }
+
+  // Default: neutral badge
+  return <span className="px-2 py-1 rounded-full text-xs bg-slate-100 text-slate-700">{estado}</span>
+}
 export default function Historial() {
   // Traemos TODAS las órdenes de la base de datos
   const { data: ordenes, loading, error } = useCollection('ordenes')
@@ -23,6 +43,8 @@ export default function Historial() {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [editing, setEditing] = useState(null) // orden object or null
+  const [includedIds, setIncludedIds] = useState([]) // keep recently created/edited ids visible
+  const [deleting, setDeleting] = useState(false)
   const [form, setForm] = useState({
     vehiculo_patente: '', chofer_nombre: '', fecha: '', km_ingreso: '', estado_trabajo: 'FINALIZADO', detalle_reparacion: '', observaciones: ''
   })
@@ -49,7 +71,8 @@ export default function Historial() {
   const filteredAndSorted = useMemo(() => {
     if (!ordenes) return []
     let list = ordenes
-      .filter(o => o.estado_trabajo === 'FINALIZADO')
+      // Show finalizadas plus any recently created/edited items so they don't "disappear" when status changes
+      .filter(o => o.estado_trabajo === 'FINALIZADO' || includedIds.includes(o.id))
       .filter(o => {
         const pMatch = !patenteFilter || (o.vehiculo_patente || '').toLowerCase().includes(patenteFilter.toLowerCase())
         const cMatch = !choferFilter || (o.chofer_nombre || '').toLowerCase().includes(choferFilter.toLowerCase())
@@ -64,7 +87,7 @@ export default function Historial() {
       return 0
     })
     return list
-  }, [ordenes, patenteFilter, choferFilter, sortField, sortDir])
+  }, [ordenes, patenteFilter, choferFilter, sortField, sortDir, includedIds])
 
   const toggleSort = (field) => {
     if (sortField === field) setSortDir(prev => prev === 'asc' ? 'desc' : 'asc')
@@ -124,12 +147,16 @@ export default function Historial() {
       }
       if (editing && editing.id) {
         await updateOrden(editing.id, payload)
+        // ensure the just-edited record remains visible even if its estado changed
+        setIncludedIds(prev => prev.includes(editing.id) ? prev : [...prev, editing.id])
         alert('Orden actualizada')
       } else {
-        await addOrden(payload)
+        const res = await addOrden(payload)
+        if (res?.id) setIncludedIds(prev => prev.includes(res.id) ? prev : [...prev, res.id])
         alert('Orden creada')
       }
       setShowForm(false)
+      setEditing(null)
     } catch (err) {
       console.error(err)
       alert('Error guardando orden')
@@ -149,7 +176,22 @@ export default function Historial() {
           <div className="bg-white px-4 py-2 rounded-lg shadow-sm border text-sm font-bold text-indigo-600">
             Total: {filteredAndSorted.length} Registros
           </div>
-          <button className="bg-emerald-500 text-white px-3 py-1 rounded text-sm" onClick={openNew}>Agregar orden</button>
+            <button className="bg-emerald-500 text-white px-3 py-1 rounded text-sm" onClick={openNew}>Agregar orden</button>
+            <button disabled={deleting} onClick={async () => {
+              if (!confirm('¿Eliminar TODO el historial de órdenes finalizadas? Esta acción es irreversible.')) return
+              setDeleting(true)
+              try {
+                const res = await deleteFinalizados()
+                alert(`Se eliminaron ${res.deleted || 0} registros finalizados.`)
+                // clear any included ids we were keeping
+                setIncludedIds([])
+              } catch (err) {
+                console.error(err)
+                alert('Error eliminando historial')
+              } finally {
+                setDeleting(false)
+              }
+            }} className="bg-red-500 text-white px-3 py-1 rounded text-sm">{deleting ? 'Eliminando...' : 'Eliminar historial'}</button>
         </div>
       </div>
 
@@ -164,13 +206,14 @@ export default function Historial() {
       {error && <p className="text-red-600">Error: {error.message}</p>}
 
       {!loading && !error && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden" style={{ marginLeft: '-1cm' }}>
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-100 text-slate-600 uppercase text-xs font-bold border-b border-slate-200">
                 <th className="px-6 py-3 cursor-pointer" onClick={() => toggleSort('fecha_ingreso')}>Fecha {sortIndicator('fecha_ingreso')}</th>
                 <th className="px-6 py-3 cursor-pointer" onClick={() => toggleSort('vehiculo_patente')}>Vehículo {sortIndicator('vehiculo_patente')}</th>
                 <th className="px-6 py-3 cursor-pointer" onClick={() => toggleSort('chofer_nombre')}>Chofer {sortIndicator('chofer_nombre')}</th>
+                <th className="px-6 py-3 cursor-pointer" onClick={() => toggleSort('estado_trabajo')}>Estado {sortIndicator('estado_trabajo')}</th>
                 <th className="px-6 py-3 cursor-pointer" onClick={() => toggleSort('detalle_reparacion')}>Detalle Reparación {sortIndicator('detalle_reparacion')}</th>
                 <th className="px-6 py-3 cursor-pointer" onClick={() => toggleSort('observaciones')}>Novedad / Observación {sortIndicator('observaciones')}</th>
                 <th className="px-6 py-3">Acciones</th>
@@ -189,6 +232,9 @@ export default function Historial() {
                   </td>
                   <td className="px-6 py-3 text-slate-600 capitalize">
                     {orden.chofer_nombre?.toLowerCase()}
+                  </td>
+                  <td className="px-6 py-3">
+                    {renderEstadoBadge(orden.estado_trabajo)}
                   </td>
                   <td className="px-6 py-3 text-slate-600">
                     {/* Renderizar objeto de reparaciones o texto */}
@@ -217,6 +263,58 @@ export default function Historial() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {/* Modal / Form para agregar / editar orden */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <form onSubmit={handleSubmit} className="w-full max-w-2xl bg-white rounded-lg p-6 shadow-lg">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold">{editing ? 'Editar Orden' : 'Nueva Orden'}</h2>
+              <button type="button" onClick={() => { setShowForm(false); setEditing(null) }} className="text-slate-500">Cerrar</button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-slate-600">Patente</label>
+                <input className="w-full px-3 py-2 border rounded" value={form.vehiculo_patente} onChange={e => setForm({...form, vehiculo_patente: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-600">Chofer</label>
+                <input className="w-full px-3 py-2 border rounded" value={form.chofer_nombre} onChange={e => setForm({...form, chofer_nombre: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-600">Fecha</label>
+                <input type="date" className="w-full px-3 py-2 border rounded" value={form.fecha} onChange={e => setForm({...form, fecha: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-600">Km ingreso</label>
+                <input type="number" className="w-full px-3 py-2 border rounded" value={form.km_ingreso} onChange={e => setForm({...form, km_ingreso: e.target.value})} />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm text-slate-600">Estado</label>
+                <select className="w-full px-3 py-2 border rounded" value={form.estado_trabajo} onChange={e => setForm({...form, estado_trabajo: e.target.value})}>
+                  <option value="FINALIZADO">FINALIZADO</option>
+                  <option value="EN PROCESO">EN PROCESO</option>
+                  <option value="PENDIENTE">PENDIENTE</option>
+                  <option value="TALLER">TALLER</option>
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm text-slate-600">Detalle Reparación</label>
+                <textarea className="w-full px-3 py-2 border rounded" rows={3} value={form.detalle_reparacion} onChange={e => setForm({...form, detalle_reparacion: e.target.value})} />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-sm text-slate-600">Observaciones</label>
+                <textarea className="w-full px-3 py-2 border rounded" rows={2} value={form.observaciones} onChange={e => setForm({...form, observaciones: e.target.value})} />
+              </div>
+            </div>
+
+            <div className="mt-4 flex justify-end gap-3">
+              <button type="button" onClick={() => { setShowForm(false); setEditing(null) }} className="px-4 py-2 rounded border">Cancelar</button>
+              <button type="submit" disabled={saving} className="px-4 py-2 rounded bg-indigo-600 text-white">{saving ? 'Guardando...' : 'Guardar'}</button>
+            </div>
+          </form>
         </div>
       )}
     </div>
