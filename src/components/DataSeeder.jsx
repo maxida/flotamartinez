@@ -2,12 +2,8 @@ import { useState } from 'react';
 import { db } from '../services/firebase'; 
 import { collection, doc, setDoc, addDoc, Timestamp } from 'firebase/firestore';
 
-const DataSeeder = () => {
-  const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState('');
-
-  // TUS DATOS (FLOTA MARTINEZ 1)
-  const historialData = [
+// TUS DATOS (FLOTA MARTINEZ 1) - exportamos para poder reutilizarlos
+export const historialData = [
     { "patente": "AD129AI", "modelo": "Kangoo", "anio": null, "fecha": "2025-12-26", "km": 129879, "chofer": "JOSE MARIA", "reparaciones": {"tren_delantero": "bieletas- casoletas- crapodinas- ruleman de rueda lado izq"} },
     { "patente": "JAO082", "modelo": "H1", "anio": 2010, "vtv": "2024-04-01", "fecha": "2025-11-04", "km": 229635, "chofer": "JOSE MARIA", "reparaciones": {}, "novedad": "LEVANTA TEMPERATURA" },
     { "patente": "JAO082", "modelo": "H1", "anio": null, "fecha": "2025-11-11", "km": null, "chofer": "JOSE MARIA", "reparaciones": {"mecanica_ligera": "REPARACION DE RADIADOR "} },
@@ -37,128 +33,114 @@ const DataSeeder = () => {
     { "patente": "JAO082", "modelo": "H1", "anio": null, "fecha": "2025-12-08", "km": null, "reparaciones": {"frenos": "CAMBIO DE CABLE DE FRENO TRASERO"} }
   ];
 
-  // Función auxiliar para parsear fechas y compararlas
-  const parseDate = (dateStr) => {
-    if (!dateStr) return new Date(0); // Fecha muy vieja si es null
-    // Intenta parsear ISO (YYYY-MM-DD)
-    let d = new Date(dateStr);
-    if (!isNaN(d)) return d;
-    // Intenta parsear DD/MM/YYYY si falla lo anterior
-    if (dateStr.includes('/')) {
-        const parts = dateStr.split('/');
-        if(parts.length === 3) return new Date(parts[2], parts[1]-1, parts[0]);
-    }
-    return new Date(0);
-  };
-
-  const handleUpload = async () => {
-    setLoading(true);
-    setStatus('Calculando los mejores datos (KM, VTV, Oblea)...');
-    try {
-      // 1. LÓGICA PREVIA: Encontrar "Lo mejor" para cada patente
-      const bestData = {}; // { AD129AI: { maxKm: 0, maxVTV: '...', maxOblea: '...' } }
-
-      historialData.forEach(item => {
-        if (!item.patente) return;
-        const p = item.patente;
-
-        // Inicializar si no existe
-        if (!bestData[p]) {
-            bestData[p] = { maxKm: 0, latestVTV: null, latestOblea: null, anio: null };
-        }
-
-        // A) Mejor KM (Mayor gana)
-        if (item.km && item.km > bestData[p].maxKm) {
-            bestData[p].maxKm = item.km;
-        }
-
-        // B) Mejor VTV (Fecha más futura gana)
-        if (item.vtv) {
-            const currentVTV = parseDate(bestData[p].latestVTV);
-            const newVTV = parseDate(item.vtv);
-            if (newVTV > currentVTV) bestData[p].latestVTV = item.vtv;
-        }
-
-        // C) Mejor Oblea (Fecha más futura gana)
-        if (item.oblea) {
-            const currentOblea = parseDate(bestData[p].latestOblea);
-            const newOblea = parseDate(item.oblea);
-            if (newOblea > currentOblea) bestData[p].latestOblea = item.oblea;
-        }
-        
-        // D) Año: preferir un valor numérico no nulo (tomar el mayor si hay varios)
-        if (item.anio && Number.isFinite(Number(item.anio))) {
-            const y = Number(item.anio);
-            if (!bestData[p].anio || y > bestData[p].anio) bestData[p].anio = y;
-        }
-      });
-
-      setStatus('Iniciando carga de datos optimizados...');
-      let count = 0;
-
-      for (const item of historialData) {
-        
-        // 2. Guardar Vehículo usando los DATOS GANADORES
-        if (item.patente) {
-          const vehiculoRef = doc(db, 'vehiculo', item.patente);
-          const mejoresDatos = bestData[item.patente];
-
-          // Solo guardamos si tenemos datos válidos
-          // Construir payload evitando sobrescribir el año con null
-          const vehPayload = {
-            patente: item.patente,
-            modelo: item.modelo || 'Desconocido',
-            // Usamos las fechas "ganadoras"
-            vtv_vencimiento: mejoresDatos.latestVTV || null,
-            oblea_vencimiento: mejoresDatos.latestOblea || null,
-            // Usamos el KM ganador
-            kilometros: mejoresDatos.maxKm || item.km || 0,
-            fecha_trabajo: item.fecha || null
-          };
-          if (mejoresDatos.anio) vehPayload.anio = mejoresDatos.anio;
-
-          await setDoc(vehiculoRef, vehPayload, { merge: true });
-        }
-
-        // 3. Guardar Chofer
-        if (item.chofer) {
-          const choferId = item.chofer.toLowerCase().replace(/\s/g, '');
-          const choferRef = doc(db, 'chofer', choferId);
-          await setDoc(choferRef, {
-            nombre: item.chofer.trim(),
-            estado: 'Activo'
-          }, { merge: true });
-        }
-
-        // 4. Crear Historial (Orden Finalizada)
-        const fechaDate = item.fecha ? new Date(item.fecha) : new Date();
-        
-        await addDoc(collection(db, 'ordenes'), {
-          vehiculo_patente: item.patente,
-          chofer_nombre: item.chofer || 'Desconocido',
-          fecha_ingreso: Timestamp.fromDate(fechaDate),
-          fecha_salida: Timestamp.fromDate(fechaDate),
-          km_ingreso: item.km || 0,
-          estado_trabajo: 'FINALIZADO',
-          origen: 'MIGRACION_FINAL_BEST_DATES',
-          detalle_reparacion: item.reparaciones || {},
-          observaciones: item.novedad || ''
-        });
-
-        count++;
-        setStatus(`Procesando registro ${count}...`);
-      }
-      setStatus('¡Todo listo! Fechas y KM actualizados al más reciente.');
-      alert('Base de datos actualizada: Ahora verás los vencimientos más nuevos.');
-    } catch (error) {
-      console.error(error);
-      setStatus('Error al cargar datos. Revisa la consola.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  
+// Función auxiliar para parsear fechas y compararlas
+const parseDate = (dateStr) => {
+  if (!dateStr) return new Date(0); // Fecha muy vieja si es null
+  // Intenta parsear ISO (YYYY-MM-DD)
+  let d = new Date(dateStr);
+  if (!isNaN(d)) return d;
+  // Intenta parsear DD/MM/YYYY si falla lo anterior
+  if (dateStr && dateStr.includes('/')) {
+      const parts = dateStr.split('/');
+      if(parts.length === 3) return new Date(parts[2], parts[1]-1, parts[0]);
+  }
+  return new Date(0);
 };
 
-export default DataSeeder;
+// Exportamos una función utilizable desde otras páginas para insertar los 27 registros
+export async function seedHistorial(onProgress) {
+  try {
+    if (onProgress) onProgress('Calculando los mejores datos (KM, VTV, Oblea)...');
+    const bestData = {};
+
+    historialData.forEach(item => {
+      if (!item.patente) return;
+      const p = item.patente;
+      if (!bestData[p]) bestData[p] = { maxKm: 0, latestVTV: null, latestOblea: null, anio: null };
+
+      if (item.km && item.km > bestData[p].maxKm) {
+        bestData[p].maxKm = item.km;
+      }
+
+      if (item.vtv) {
+        const currentVTV = parseDate(bestData[p].latestVTV);
+        const newVTV = parseDate(item.vtv);
+        if (newVTV > currentVTV) bestData[p].latestVTV = item.vtv;
+      }
+
+      if (item.oblea) {
+        const currentOblea = parseDate(bestData[p].latestOblea);
+        const newOblea = parseDate(item.oblea);
+        if (newOblea > currentOblea) bestData[p].latestOblea = item.oblea;
+      }
+
+      if (item.anio && Number.isFinite(Number(item.anio))) {
+        const y = Number(item.anio);
+        if (!bestData[p].anio || y > bestData[p].anio) bestData[p].anio = y;
+      }
+    });
+
+    // Removed markdown fence for valid JS
+    let count = 0;
+
+    for (const item of historialData) {
+      // Guardar Vehículo
+      if (item.patente) {
+        const vehiculoRef = doc(db, 'vehiculo', item.patente);
+        const mejoresDatos = bestData[item.patente] || {};
+        const vehPayload = {
+          patente: item.patente,
+          modelo: item.modelo || 'Desconocido',
+          vtv_vencimiento: mejoresDatos.latestVTV || null,
+          oblea_vencimiento: mejoresDatos.latestOblea || null,
+          kilometros: mejoresDatos.maxKm || item.km || 0,
+          fecha_trabajo: item.fecha || null
+        };
+        if (mejoresDatos.anio) vehPayload.anio = mejoresDatos.anio;
+        await setDoc(vehiculoRef, vehPayload, { merge: true });
+      }
+
+      // Guardar Chofer
+      if (item.chofer) {
+        const choferId = item.chofer.toLowerCase().replace(/\s/g, '');
+        const choferRef = doc(db, 'chofer', choferId);
+        await setDoc(choferRef, {
+          nombre: item.chofer.trim(),
+          estado: 'Activo'
+        }, { merge: true });
+      }
+
+      // Crear Historial (Orden Finalizada)
+      const fechaDate = item.fecha ? new Date(item.fecha) : new Date();
+      await addDoc(collection(db, 'ordenes'), {
+        vehiculo_patente: item.patente,
+        chofer_nombre: item.chofer || 'Desconocido',
+        fecha_ingreso: Timestamp.fromDate(fechaDate),
+        fecha_salida: Timestamp.fromDate(fechaDate),
+        km_ingreso: item.km || 0,
+        estado_trabajo: 'FINALIZADO',
+        origen: 'MIGRACION_FINAL_BEST_DATES',
+        detalle_reparacion: item.reparaciones || {},
+        observaciones: item.novedad || ''
+      });
+
+      count++;
+      if (onProgress) onProgress(`Procesando registro ${count}...`);
+    }
+
+    if (onProgress) onProgress('¡Todo listo!');
+    return { success: true, count };
+  } catch (error) {
+    console.error('Error en seedHistorial:', error);
+    return { success: false, error };
+  }
+}
+
+// Note: UI trigger component removed to avoid rendering import buttons.
+// If you need a UI button later, re-add a component that calls `seedHistorial`.
+
+// Restauramos una exportación por defecto vacía para mantener compatibilidad
+// con importaciones existentes (p.ej. `import DataSeeder from './DataSeeder'`).
+export default function DataSeeder() {
+  return null;
+}
