@@ -148,21 +148,72 @@ const DataSeeder = () => {
     }
   };
 
+  // INVENTARIO seed
+  const inventarioData = [
+    { nombre: 'Aceite Semisintético 10W40', categoria: 'Fluidos', compatibilidad: 'Universal', stock: 0 },
+    { nombre: 'Aceite Sintético 5W40', categoria: 'Fluidos', compatibilidad: 'Universal', stock: 4 },
+    { nombre: 'Batería 12x65 Moura', categoria: 'Electricidad', compatibilidad: 'Vehículos Medianos - Peugeot', stock: 1 },
+    { nombre: 'Batería 12x75 Moura', categoria: 'Electricidad', compatibilidad: 'Camionetas/Diesel', stock: 0 },
+    { nombre: 'Bieletas', categoria: 'Suspensión', compatibilidad: 'Peugeot / Citroen', stock: 0 },
+    { nombre: 'Bujías (Juego x4)', categoria: 'Motor', compatibilidad: 'Universal Nafta', stock: 6 },
+    { nombre: 'Discos de Freno Ventilados', categoria: 'Frenos', compatibilidad: 'Específico por Modelo', stock: 0 },
+    { nombre: 'Extremo de dirección - 24616', categoria: 'Suspensión', compatibilidad: 'kangoo/ sandero/ logan', stock: 3 },
+    { nombre: 'Filtro de Aceite (Cartucho)', categoria: 'Filtros', compatibilidad: 'VW / Ford / Fiat', stock: 1 },
+    { nombre: 'Filtro de Aire', categoria: 'Filtros', compatibilidad: 'Varios', stock: 0 },
+    { nombre: 'Filtro de Habitáculo', categoria: 'Filtros', compatibilidad: 'Varios', stock: 2 },
+    { nombre: 'Líquido de Frenos DOT 4', categoria: 'Fluidos', compatibilidad: 'Universal', stock: 0 },
+    { nombre: 'Líquido Refrigerante Rosa', categoria: 'Fluidos', compatibilidad: 'Universal', stock: 0 },
+    { nombre: 'Pastillas de Freno (Juego)', categoria: 'Frenos', compatibilidad: 'VW Gol / Trend / Voyage', stock: 8 },
+    { nombre: 'Rótula de Suspensión', categoria: 'Suspensión', compatibilidad: 'Universal', stock: 1 }
+  ]
+
+  const handleSeedInventario = async () => {
+    setLoading(true)
+    setStatus('Cargando inventario...')
+    try {
+      let i = 0
+      for (const item of inventarioData) {
+        await addDoc(collection(db, 'inventario'), item)
+        i++
+        setStatus(`Agregados ${i} de ${inventarioData.length} items...`)
+      }
+      setStatus('Inventario cargado correctamente')
+      alert('Inventario agregado a Firebase')
+    } catch (err) {
+      console.error('Error cargando inventario', err)
+      setStatus('Error cargando inventario. Revisa consola')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="p-6 bg-blue-50 border border-blue-200 rounded-lg mb-4 shadow-sm text-center">
       <h3 className="text-xl font-bold text-blue-800 mb-2">📥 Cargar Datos Maestros</h3>
       <p className="text-blue-700 mb-4">
         Carga los 27 registros históricos con estado <b>FINALIZADO</b>.
       </p>
+      <div className="flex gap-4 justify-center">
       <button 
         onClick={handleUpload} 
         disabled={loading}
-        className={`px-8 py-3 rounded-lg text-white font-bold text-lg shadow transition-colors ${
+        className={`px-6 py-2 rounded-lg text-white font-bold shadow transition-colors ${
           loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
         }`}
       >
         {loading ? 'Procesando...' : 'INICIAR CARGA DE DATOS'}
       </button>
+
+      <button
+        onClick={handleSeedInventario}
+        disabled={loading}
+        className={`px-6 py-2 rounded-lg text-white font-bold shadow transition-colors ${
+          loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
+        }`}
+      >
+        {loading ? 'Procesando...' : 'CARGAR INVENTARIO'}
+      </button>
+      </div>
       {status && <p className="mt-4 text-sm font-semibold text-blue-900 bg-blue-100 py-2 rounded">{status}</p>}
     </div>
   );

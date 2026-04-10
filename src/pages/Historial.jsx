@@ -34,6 +34,30 @@ const renderEstadoBadge = (estado) => {
 export default function Historial() {
   // Traemos TODAS las órdenes de la base de datos
   const { data: ordenes, loading, error } = useCollection('ordenes')
+  // Traemos vehículos para poblar el selector de patentes
+  // NOTE: collection name in Firestore is `vehiculo` (singular) per project data
+  const { data: vehiculos, loading: vehiculosLoading, error: vehiculosError } = useCollection('vehiculo')
+
+  // Debug: log vehiculos to help find why no patente appears
+  React.useEffect(() => {
+    console.debug('[Historial] vehiculos snapshot', { length: Array.isArray(vehiculos) ? vehiculos.length : 0, sample: vehiculos && vehiculos.length ? vehiculos[0] : null, loading: vehiculosLoading, error: vehiculosError })
+  }, [vehiculos, vehiculosLoading, vehiculosError])
+
+  // Helper: try multiple common field names to extract the patente value
+  const extractPatente = (v) => {
+    if (!v) return ''
+    const candidates = ['patente', 'placa', 'plate', 'matricula']
+    for (const k of candidates) {
+      if (v[k]) return String(v[k]).toUpperCase()
+    }
+    // fallback: if any string-like field exists, try to find it
+    const keys = Object.keys(v || {})
+    for (const k of keys) {
+      const val = v[k]
+      if (typeof val === 'string' && /[A-Z0-9\- ]+/i.test(val) && val.length >= 3 && val.length <= 10) return val.toUpperCase()
+    }
+    return ''
+  }
   const [patenteFilter, setPatenteFilter] = useState('')
   const [choferFilter, setChoferFilter] = useState('')
 
@@ -99,7 +123,7 @@ export default function Historial() {
     setEditing(orden)
     const fechaVal = orden.fecha_ingreso?.toDate ? orden.fecha_ingreso.toDate().toISOString().slice(0,10) : ''
     setForm({
-      vehiculo_patente: orden.vehiculo_patente || '',
+      vehiculo_patente: (orden.vehiculo_patente || '').toString().toUpperCase(),
       chofer_nombre: orden.chofer_nombre || '',
       fecha: fechaVal,
       km_ingreso: orden.km_ingreso || '',
@@ -158,32 +182,17 @@ export default function Historial() {
   }
 
   return (
-    <div className="p-6 bg-slate-50 min-h-screen">
+    <div className="w-full px-6 py-6 bg-slate-50 min-h-screen">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Historial de Reparaciones</h1>
           <p className="text-slate-500 text-sm">Registro histórico y órdenes finalizadas</p>
         </div>
-        <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3">
           <div className="bg-white px-4 py-2 rounded-lg shadow-sm border text-sm font-bold text-indigo-600">
             Total: {filteredAndSorted.length} Registros
           </div>
             <button className="bg-emerald-500 text-white px-3 py-1 rounded text-sm" onClick={openNew}>Agregar orden</button>
-            <button disabled={deleting} onClick={async () => {
-              if (!confirm('¿Eliminar TODO el historial de órdenes finalizadas? Esta acción es irreversible.')) return
-              setDeleting(true)
-              try {
-                const res = await deleteFinalizados()
-                alert(`Se eliminaron ${res.deleted || 0} registros finalizados.`)
-                // clear any included ids we were keeping
-                setIncludedIds([])
-              } catch (err) {
-                console.error(err)
-                alert('Error eliminando historial')
-              } finally {
-                setDeleting(false)
-              }
-            }} className="bg-red-500 text-white px-3 py-1 rounded text-sm">{deleting ? 'Eliminando...' : 'Eliminar historial'}</button>
         </div>
       </div>
 
@@ -198,7 +207,7 @@ export default function Historial() {
       {error && <p className="text-red-600">Error: {error.message}</p>}
 
       {!loading && !error && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden" style={{ marginLeft: '-1cm' }}>
+      <div className="bg-white w-full rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-100 text-slate-600 uppercase text-xs font-bold border-b border-slate-200">
@@ -268,9 +277,18 @@ export default function Historial() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm text-slate-600">Patente</label>
-                <input className="w-full px-3 py-2 border rounded" value={form.vehiculo_patente} onChange={e => setForm({...form, vehiculo_patente: e.target.value})} />
-              </div>
+                  <label className="block text-sm text-slate-600">Patente</label>
+                  {/* Selector populated from vehiculos collection (campo 'patente') */}
+                  <select className="w-full px-3 py-2 border rounded" value={form.vehiculo_patente} onChange={e => setForm({...form, vehiculo_patente: e.target.value})}>
+                    <option value="">{vehiculosLoading ? '-- Cargando patentes --' : '-- Seleccionar patente --'}</option>
+                    {Array.isArray(vehiculos) && Array.from(new Set(vehiculos.map(v => extractPatente(v)).filter(Boolean))).map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                    {!vehiculosLoading && Array.isArray(vehiculos) && vehiculos.length === 0 && (
+                      <option value="">-- No hay patentes registradas --</option>
+                    )}
+                  </select>
+                </div>
               <div>
                 <label className="block text-sm text-slate-600">Chofer</label>
                 <input className="w-full px-3 py-2 border rounded" value={form.chofer_nombre} onChange={e => setForm({...form, chofer_nombre: e.target.value})} />

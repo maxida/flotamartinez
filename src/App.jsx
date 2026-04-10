@@ -6,6 +6,8 @@ import Choferes from './pages/Choferes'
 import Ordenes from './pages/Ordenes'
 import Historial from './pages/Historial'
 import Dashboard from './pages/Dashboard'
+import Inventario from './pages/Inventario'
+import Seeder from './components/Seeder'
 
 function App() {
   return (
@@ -18,6 +20,8 @@ function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/vehiculos" element={<Vehiculos />} />
+          <Route path="/inventario" element={<Inventario />} />
+          <Route path="/seed" element={<Seeder />} />
           <Route path="/choferes" element={<Choferes />} />
           {/* Route for creating orders removed */}
           <Route path="/historial" element={<Historial />} />
