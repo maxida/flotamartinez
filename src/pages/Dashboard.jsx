@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import useCollection from '../hooks/useCollection'
 import {
   ResponsiveContainer,
@@ -12,6 +12,7 @@ import {
   PieChart,
   Pie,
   Cell
+  ,ComposedChart, Line
 } from 'recharts'
 
 const formatDate = (timestamp) => {
@@ -40,11 +41,48 @@ const COLORS = {
 
 export default function Dashboard() {
   const { data: ordenes = [], loading, error } = useCollection('ordenes')
+  const [period, setPeriod] = useState('año') // dia, semana, mes, año
+  const [driverFilter, setDriverFilter] = useState('ALL') // ALL or driver name
 
-  // derive driver stats
+  // list of driver names for filter select (from all orders)
+  const driversList = useMemo(() => {
+    const s = new Set()
+    for (const o of ordenes || []) {
+      const name = (o.chofer_nombre || 'Sin Nombre').toString().trim() || 'Sin Nombre'
+      s.add(name)
+    }
+    return Array.from(s).sort((a, b) => a.localeCompare(b))
+  }, [ordenes])
+
+  // filter orders according to selected period and driver. This filtered set will
+  // be used for KPIs and charts; the recent activity table will still use full orders.
+  const filteredOrders = useMemo(() => {
+    if (!Array.isArray(ordenes)) return []
+    const now = new Date()
+    let days = 30
+    if (period === 'dia') days = 1
+    else if (period === 'semana') days = 7
+    else if (period === 'mes') days = 30
+    else if (period === 'año' || period === 'ano' || period === 'anio') days = 365
+
+    const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
+
+    return ordenes.filter(o => {
+      const fecha = o.fecha_ingreso?.toDate ? o.fecha_ingreso.toDate() : (o.fecha_ingreso ? new Date(o.fecha_ingreso) : null)
+      if (!fecha) return false
+      if (fecha < cutoff) return false
+      if (driverFilter && driverFilter !== 'ALL') {
+        const name = (o.chofer_nombre || 'Sin Nombre').toString().trim() || 'Sin Nombre'
+        return name === driverFilter
+      }
+      return true
+    })
+  }, [ordenes, period, driverFilter])
+
+  // derive driver stats (based on filteredOrders)
   const { drivers, barData, pieData, top3, mostAlerts, leastAlerts } = useMemo(() => {
     const map = new Map()
-    for (const o of ordenes || []) {
+    for (const o of filteredOrders || []) {
       const name = (o.chofer_nombre || 'Sin Nombre').toString().trim() || 'Sin Nombre'
       const estado = (o.estado_trabajo || 'OTRO').toString().trim().toUpperCase()
       const observacion = (o.observaciones || '')?.toString().trim()
@@ -84,9 +122,28 @@ export default function Dashboard() {
     }
 
     return { drivers: driversArr, barData, pieData, top3, mostAlerts, leastAlerts }
-  }, [ordenes])
+  }, [filteredOrders])
 
-  // recent orders
+  // pareto data: drivers sorted by count with cumulative percentage
+  const paretoData = useMemo(() => {
+    // build totals per driver from filteredOrders
+    const map = new Map()
+    for (const o of filteredOrders || []) {
+      const name = (o.chofer_nombre || 'Sin Nombre').toString().trim() || 'Sin Nombre'
+      map.set(name, (map.get(name) || 0) + 1)
+    }
+    const arr = Array.from(map.entries()).map(([name, count]) => ({ name, count }))
+    arr.sort((a, b) => b.count - a.count)
+    const total = arr.reduce((s, v) => s + v.count, 0)
+    let cum = 0
+    const out = arr.map(item => {
+      cum += item.count
+      return { name: item.name, count: item.count, cumulative: total ? Math.round((cum / total) * 10000) / 100 : 0 }
+    })
+    return out
+  }, [filteredOrders])
+
+  // recent orders (keep unfiltered — table should show latest overall)
   const latest = useMemo(() => {
     if (!Array.isArray(ordenes)) return []
     const sorted = [...ordenes].sort((a, b) => {
@@ -97,9 +154,33 @@ export default function Dashboard() {
     return sorted.slice(0, 10)
   }, [ordenes])
 
+
   return (
     <section className="w-full">
       {/* KPIs */}
+      {/* Filters: periodo y chofer */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <label className="text-sm text-slate-600">Periodo:</label>
+          <select value={period} onChange={(e) => setPeriod(e.target.value)} className="border rounded-md px-3 py-1 text-sm">
+            <option value="dia">Día</option>
+            <option value="semana">Semana</option>
+            <option value="mes">Mes</option>
+            <option value="año">Año</option>
+          </select>
+
+          <label className="text-sm text-slate-600">Chofer:</label>
+          <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="border rounded-md px-3 py-1 text-sm">
+            <option value="ALL">Todos</option>
+            {driversList.map(d => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="text-sm text-slate-500">Mostrando: <span className="font-medium">{period}</span> — <span className="font-medium">{driverFilter === 'ALL' ? 'Todos' : driverFilter}</span></div>
+      </div>
+
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-red-50 border border-red-200 rounded-xl shadow-sm p-5">
           <div className="text-sm text-red-600">Mayor Tasa de Alertas</div>
@@ -115,7 +196,7 @@ export default function Dashboard() {
 
         <div className="bg-white rounded-xl shadow-sm p-5">
           <div className="text-sm text-slate-500">Órdenes totales</div>
-          <div className="mt-2 text-2xl font-semibold text-slate-800">{Array.isArray(ordenes) ? ordenes.length : 0}</div>
+          <div className="mt-2 text-2xl font-semibold text-slate-800">{Array.isArray(filteredOrders) ? filteredOrders.length : 0}</div>
         </div>
       </div>
 
@@ -155,6 +236,24 @@ export default function Dashboard() {
               </PieChart>
             </ResponsiveContainer>
           </div>
+        </div>
+      </div>
+
+      {/* Pareto chart: Choferes por cantidad de reparaciones */}
+      <div className="bg-white rounded-xl shadow-sm p-4 w-full mb-6">
+        <h4 className="text-sm font-semibold text-slate-800 mb-2">Pareto — Choferes por cantidad de reparaciones</h4>
+        <div style={{ width: '100%', height: 340 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={paretoData} margin={{ top: 20, right: 50, left: 20, bottom: 20 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+              <YAxis yAxisId="left" />
+              <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tickFormatter={v => `${v}%`} />
+              <Tooltip formatter={(value, name) => [value, name]} />
+              <Bar dataKey="count" yAxisId="left" fill="#3b82f6" />
+              <Line type="monotone" dataKey="cumulative" yAxisId="right" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} />
+            </ComposedChart>
+          </ResponsiveContainer>
         </div>
       </div>
 

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react'
+import * as XLSX from 'xlsx'
 import useCollection from '../hooks/useCollection'
 import { addOrden, updateOrden, deleteOrden, deleteFinalizados } from '../services/ordenesService'
 
@@ -37,6 +38,8 @@ export default function Historial() {
   // Traemos vehículos para poblar el selector de patentes
   // NOTE: collection name in Firestore is `vehiculo` (singular) per project data
   const { data: vehiculos, loading: vehiculosLoading, error: vehiculosError } = useCollection('vehiculo')
+  // Traemos choferes para poblar el selector de chofer
+  const { data: choferes, loading: choferesLoading } = useCollection('chofer')
 
   // Debug: log vehiculos to help find why no patente appears
   React.useEffect(() => {
@@ -181,6 +184,41 @@ export default function Historial() {
     }
   }
 
+  const exportToExcel = () => {
+    const formatDetalle = (det) => {
+      if (!det) return ''
+      if (typeof det === 'object' && !Array.isArray(det)) {
+        return Object.entries(det).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(' | ')
+      }
+      return String(det)
+    }
+
+    const rows = filteredAndSorted.map(o => ({
+      'Fecha': formatDate(o.fecha_ingreso),
+      'Vehículo': o.vehiculo_patente || '',
+      'Chofer': o.chofer_nombre || '',
+      'Estado': o.estado_trabajo || '',
+      'KM Ingreso': o.km_ingreso ?? '',
+      'Detalle Reparación': formatDetalle(o.detalle_reparacion),
+      'Observaciones': o.observaciones || ''
+    }))
+
+    const ws = XLSX.utils.json_to_sheet(rows)
+    ws['!cols'] = [
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 20 },
+      { wch: 15 },
+      { wch: 12 },
+      { wch: 50 },
+      { wch: 40 }
+    ]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Historial')
+    const today = new Date().toISOString().slice(0, 10)
+    XLSX.writeFile(wb, `Historial_Flota_${today}.xlsx`)
+  }
+
   return (
     <div className="w-full px-6 py-6 bg-slate-50 min-h-screen">
       <div className="flex justify-between items-center mb-6">
@@ -189,6 +227,10 @@ export default function Historial() {
           <p className="text-slate-500 text-sm">Registro histórico y órdenes finalizadas</p>
         </div>
             <div className="flex items-center gap-3">
+          <button onClick={exportToExcel} className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg text-lg transition-all border-2 border-green-500 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16" /></svg>
+            Exportar a Excel
+          </button>
           <div className="bg-white px-4 py-2 rounded-lg shadow-sm border text-sm font-bold text-indigo-600">
             Total: {filteredAndSorted.length} Registros
           </div>
@@ -291,7 +333,13 @@ export default function Historial() {
                 </div>
               <div>
                 <label className="block text-sm text-slate-600">Chofer</label>
-                <input className="w-full px-3 py-2 border rounded" value={form.chofer_nombre} onChange={e => setForm({...form, chofer_nombre: e.target.value})} />
+                <select className="w-full px-3 py-2 border rounded" value={form.chofer_nombre} onChange={e => setForm({...form, chofer_nombre: e.target.value})}>
+                  <option value="">{choferesLoading ? '-- Cargando choferes --' : '-- Seleccionar chofer --'}</option>
+                  {Array.isArray(choferes) && choferes.map(c => {
+                    const nombre = (c.nombre || c.name || '').toString().trim()
+                    return nombre ? <option key={c.id} value={nombre}>{nombre}</option> : null
+                  })}
+                </select>
               </div>
               <div>
                 <label className="block text-sm text-slate-600">Fecha</label>

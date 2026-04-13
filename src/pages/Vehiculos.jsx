@@ -305,11 +305,11 @@ export default function Vehiculos() {
       {loading && <div className="text-center py-4">Cargando flota...</div>}
 
       {!loading && !error && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden max-h-[75vh] overflow-y-auto">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-bold tracking-wider">
+                <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-bold tracking-wider sticky top-0 z-10 bg-slate-50">
                   <th className="px-6 py-4">
                     <button onClick={() => handleSort('patente')} className="flex items-center gap-2">
                       <span>Patente</span>
